@@ -1157,6 +1157,7 @@ where
                     },
                     options: tunnel_options.wireguard.options,
                     generic_options: tunnel_options.generic,
+                    obfuscation: None,
                 }
                 .into())
             }
