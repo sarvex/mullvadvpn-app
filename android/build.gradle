@@ -124,7 +124,6 @@ play {
 }
 
 repositories {
-    jcenter()
     google()
 }
 
@@ -176,7 +175,6 @@ buildscript {
         mockkVersion = '1.10.6'
     }
     repositories {
-        jcenter()
         google()
 
         maven {
