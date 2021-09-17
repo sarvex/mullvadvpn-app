@@ -33,7 +33,15 @@ jobs:
 
             - name: List files/dirs
               run: |
-                ls -la
+                ls -al
+                
+            - name: Build
+              run: |
+                ./build-apk.sh --no-docker --dev-build
+                
+              #./wireguard/build-wireguard-go.sh --android --no-docker
+              #./build-apk.sh --no-docker
+
                 
 
 
