@@ -28,94 +28,102 @@ jobs:
         runs-on: ubuntu-20.04
         container: quay.io/mullvad/mullvad-android-app-build
         steps:
-            - name: Checkout repository
+            - name: Checkout repository and list files/dirs
               uses: actions/checkout@v2
-
-            - name: Declare commit sha variable
-              id: vars
-              shell: bash
               run: |
-                echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+                ls -la
 
-            - name: Configure cache
-              uses: actions/cache@v2
-              with:
-                path: |
-                    ~/.gradle/caches
-                    ~/.gradle/wrapper
-                    ./android/build
-                key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}-${{ steps.vars.outputs.sha_short }}
-                restore-keys: |
-                    gradle-${{ steps.vars.outputs.sha_short }}
-
-            - name: Bind Cargo with NDK
+            - name: List files/dirs
               run: |
-                cat >> $HOME/.cargo/config << EOF
-                [target.x86_64-linux-android]
-                ar = "${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android-ar"
-                linker = "${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang"
-                EOF
+                ls -la
+                
 
-            - name: Build and run unit tests
-              env:
-                RUSTFLAGS: --deny warnings
-                NDK_TOOLCHAIN_DIR: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
-                AR_x86_64_linux_android: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android-ar
-                CC_x86_64_linux_android: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang
-                ARCHITECTURES: aarch64 x86_64
-              run: |
-                ./wireguard/build-wireguard-go.sh --android --no-docker
-                source env.sh x86_64-linux-android
-                cargo build --target x86_64-linux-android --verbose --package mullvad-jni
-                cd android
-                ./gradlew --console plain assembleDebug
-                ./gradlew testDebugUnitTest
 
-    instrumented-tests:
-        name: Instrumented tests
-        runs-on: macos-latest
-        timeout-minutes: 30
-        needs:
-          - build
-        strategy:
-            fail-fast: false
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v2
+            # - name: Declare commit sha variable
+            #   id: vars
+            #   shell: bash
+            #   run: |
+            #     echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
-            - name: Declare commit sha variable
-              id: vars
-              shell: bash
-              run: |
-                echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+            # - name: Configure cache
+            #   uses: actions/cache@v2
+            #   with:
+            #     path: |
+            #         ~/.gradle/caches
+            #         ~/.gradle/wrapper
+            #         ./android/build
+            #     key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}-${{ steps.vars.outputs.sha_short }}
+            #     restore-keys: |
+            #         gradle-${{ steps.vars.outputs.sha_short }}
 
-            - name: Set up Java
-              uses: actions/setup-java@v1
-              with:
-                java-version: 1.8
+            # - name: Bind Cargo with NDK
+            #   run: |
+            #     cat >> $HOME/.cargo/config << EOF
+            #     [target.x86_64-linux-android]
+            #     ar = "${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android-ar"
+            #     linker = "${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang"
+            #     EOF
 
-            - uses: gradle/wrapper-validation-action@v1
+            # - name: Build and run unit tests
+            #   env:
+            #     RUSTFLAGS: --deny warnings
+            #     NDK_TOOLCHAIN_DIR: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+            #     AR_x86_64_linux_android: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android-ar
+            #     CC_x86_64_linux_android: ${{ steps.install-android-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang
+            #     ARCHITECTURES: aarch64 x86_64
+            #   run: |
+            #     ./wireguard/build-wireguard-go.sh --android --no-docker
+            #     source env.sh x86_64-linux-android
+            #     cargo build --target x86_64-linux-android --verbose --package mullvad-jni
+            #     cd android
+            #     ./gradlew --console plain assembleDebug
+            #     ./gradlew testDebugUnitTest
 
-            - name: Configure cache
-              uses: actions/cache@v2
-              with:
-                path: |
-                    ~/.gradle/caches
-                    ~/.gradle/wrapper
-                    ./android/build
-                key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}-${{ steps.vars.outputs.sha_short }}
-                restore-keys: |
-                    gradle-${{ steps.vars.outputs.sha_short }}
+    # instrumented-tests:
+    #     name: Instrumented tests
+    #     runs-on: macos-latest
+    #     timeout-minutes: 30
+    #     needs:
+    #       - build
+    #     strategy:
+    #         fail-fast: false
+    #     steps:
+    #         - name: Checkout repository
+    #           uses: actions/checkout@v2
 
-            - name: Run Android instrumented tests
-              uses: reactivecircus/android-emulator-runner@v2
-              with:
-                api-level: 29
-                arch: x86_64
-                emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot-load -noaudio -no-boot-anim
-                disable-animations: true
-                profile: pixel
-                script: ./gradlew connectedCheck --stacktrace
-                working-directory: ./android
-              env:
-                API_LEVEL: 29
+    #         - name: Declare commit sha variable
+    #           id: vars
+    #           shell: bash
+    #           run: |
+    #             echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+    #         - name: Set up Java
+    #           uses: actions/setup-java@v1
+    #           with:
+    #             java-version: 1.8
+
+    #         - uses: gradle/wrapper-validation-action@v1
+
+    #         - name: Configure cache
+    #           uses: actions/cache@v2
+    #           with:
+    #             path: |
+    #                 ~/.gradle/caches
+    #                 ~/.gradle/wrapper
+    #                 ./android/build
+    #             key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}-${{ steps.vars.outputs.sha_short }}
+    #             restore-keys: |
+    #                 gradle-${{ steps.vars.outputs.sha_short }}
+
+    #         - name: Run Android instrumented tests
+    #           uses: reactivecircus/android-emulator-runner@v2
+    #           with:
+    #             api-level: 29
+    #             arch: x86_64
+    #             emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot-load -noaudio -no-boot-anim
+    #             disable-animations: true
+    #             profile: pixel
+    #             script: ./gradlew connectedCheck --stacktrace
+    #             working-directory: ./android
+    #           env:
+    #             API_LEVEL: 29
