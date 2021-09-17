@@ -25,7 +25,8 @@ on:
     workflow_dispatch:
 jobs:
     build:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-20.04
+        container: quay.io/mullvad/mullvad-android-app-build
         steps:
             - name: Checkout repository
               uses: actions/checkout@v2
@@ -35,31 +36,6 @@ jobs:
               shell: bash
               run: |
                 echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-
-            - name: Configure Rust
-              uses: ATiltedTree/setup-rust@v1.0.4
-              with:
-                  rust-version: stable
-                  targets: x86_64-linux-android
-
-            - name: Configure Go
-              uses: actions/setup-go@v2.1.3
-              with:
-                  go-version: 1.16
-
-            - name: Configure Android SDK
-              uses: maxim-lobanov/setup-android-tools@v1
-              with:
-                  packages: |
-                      platforms;android-30
-                      build-tools;30.0.3
-                  cache: true
-
-            - name: Configure Android NDK
-              id: install-android-ndk
-              uses: nttld/setup-ndk@v1
-              with:
-                  ndk-version: r20b
 
             - name: Configure cache
               uses: actions/cache@v2
