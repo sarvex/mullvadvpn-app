@@ -28,10 +28,8 @@ jobs:
         runs-on: ubuntu-20.04
         container: quay.io/mullvad/mullvad-android-app-build
         steps:
-            - name: Checkout repository and list files/dirs
+            - name: Checkout repository
               uses: actions/checkout@v2
-              run: |
-                ls -la
 
             - name: List files/dirs
               run: |
