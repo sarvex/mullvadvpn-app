@@ -350,6 +350,8 @@ impl AccountsProxy {
     }
 }
 
+pub const MAX_DEVICES_REACHED: &str = "MAX_DEVICES_REACHED";
+
 #[derive(Clone)]
 pub struct DevicesProxy {
     handle: rest::MullvadRestHandle,
