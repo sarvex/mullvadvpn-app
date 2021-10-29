@@ -217,11 +217,8 @@ impl MullvadRpcRuntime {
     /// Returns a request factory initialized to create requests for the master API
     pub fn mullvad_rest_handle(&mut self) -> rest::MullvadRestHandle {
         let service = self.new_request_service(Some(API_HOST.clone()));
-        let factory = rest::RequestFactory::new(
-            API_HOST.clone(),
-            Box::new(self.address_cache.clone()),
-            Some("app".to_owned()),
-        );
+        let factory =
+            rest::RequestFactory::new(API_HOST.clone(), Box::new(self.address_cache.clone()), None);
 
         rest::MullvadRestHandle::new(
             service,
@@ -270,7 +267,7 @@ impl AccountsProxy {
         let response = rest::send_request(
             &self.handle.factory,
             service,
-            "/v1/me",
+            "accounts/v1-alpha/accounts/me/",
             Method::GET,
             Some(account),
             StatusCode::OK,
@@ -286,7 +283,7 @@ impl AccountsProxy {
         let response = rest::send_request(
             &self.handle.factory,
             service,
-            "/v1/accounts",
+            "accounts/v1-alpha/accounts/",
             Method::POST,
             None,
             StatusCode::CREATED,
@@ -314,7 +311,7 @@ impl AccountsProxy {
         let response = rest::send_json_request(
             &self.handle.factory,
             service,
-            "/v1/submit-voucher",
+            "app/v1/submit-voucher",
             Method::POST,
             &submission,
             Some(account_token),
@@ -337,7 +334,7 @@ impl AccountsProxy {
         let response = rest::send_request(
             &self.handle.factory,
             service,
-            "/v1/www-auth-token",
+            "app/v1/www-auth-token",
             Method::POST,
             Some(account),
             StatusCode::OK,
@@ -394,7 +391,7 @@ impl DevicesProxy {
             &self.handle.factory,
             service,
             // TODO: Configurable prefix. Lazy static?
-            "/accounts/v1-alpha/devices/",
+            "accounts/v1-alpha/devices/",
             Method::POST,
             &submission,
             Some(account),
@@ -433,7 +430,7 @@ impl DevicesProxy {
             service,
             &format!(
                 // TODO: Configurable prefix. Lazy static?
-                "/accounts/v1-alpha/devices/{}/",
+                "accounts/v1-alpha/devices/{}/",
                 id,
             ),
             Method::GET,
@@ -452,7 +449,7 @@ impl DevicesProxy {
             &self.handle.factory,
             service,
             // TODO: Configurable prefix. Lazy static?
-            "/accounts/v1-alpha/devices/",
+            "accounts/v1-alpha/devices/",
             Method::GET,
             Some(account),
             StatusCode::OK,
@@ -471,7 +468,7 @@ impl DevicesProxy {
             service,
             &format!(
                 // TODO: Configurable prefix. Lazy static?
-                "/accounts/v1-alpha/devices/{}/",
+                "accounts/v1-alpha/devices/{}/",
                 id,
             ),
             Method::DELETE,
@@ -503,7 +500,7 @@ impl DevicesProxy {
             service,
             &format!(
                 // TODO: Configurable prefix. Lazy static?
-                "/accounts/v1-alpha/devices/{}/pubkey/",
+                "accounts/v1-alpha/devices/{}/pubkey/",
                 id,
             ),
             Method::PUT,
@@ -563,7 +560,7 @@ impl ProblemReportProxy {
         let request = rest::send_json_request(
             &self.handle.factory,
             service,
-            "/v1/problem-report",
+            "app/v1/problem-report",
             Method::POST,
             &report,
             None,
@@ -603,7 +600,7 @@ impl AppVersionProxy {
     ) -> impl Future<Output = Result<AppVersionResponse, rest::Error>> {
         let service = self.handle.service.clone();
 
-        let path = format!("/v1/releases/{}/{}", platform, app_version);
+        let path = format!("app/v1/releases/{}/{}", platform, app_version);
         let request = self.handle.factory.request(&path, Method::GET);
 
         async move {
@@ -646,7 +643,10 @@ impl WireguardKeyProxy {
         let service = self.handle.service.clone();
         let body = PublishRequest { pubkey: public_key };
 
-        let request = self.handle.factory.post_json(&"/v1/wireguard-keys", &body);
+        let request = self
+            .handle
+            .factory
+            .post_json(&"app/v1/wireguard-keys", &body);
         async move {
             let mut request = request?;
             if let Some(timeout) = timeout {
@@ -677,7 +677,7 @@ impl WireguardKeyProxy {
         let response = rest::send_json_request(
             &self.handle.factory,
             service,
-            &"/v1/replace-wireguard-key",
+            &"app/v1/replace-wireguard-key",
             Method::POST,
             &body,
             Some(account_token),
@@ -699,7 +699,7 @@ impl WireguardKeyProxy {
             &self.handle.factory,
             service,
             &format!(
-                "/v1/wireguard-keys/{}",
+                "app/v1/wireguard-keys/{}",
                 urlencoding::encode(&key.to_base64())
             ),
             Method::GET,
@@ -721,7 +721,7 @@ impl WireguardKeyProxy {
             &self.handle.factory,
             service,
             &format!(
-                "/v1/wireguard-keys/{}",
+                "app/v1/wireguard-keys/{}",
                 urlencoding::encode(&key.to_base64())
             ),
             Method::DELETE,
@@ -751,7 +751,7 @@ impl ApiProxy {
         let response = rest::send_request(
             &self.handle.factory,
             service,
-            "/v1/api-addrs",
+            "app/v1/api-addrs",
             Method::GET,
             None,
             StatusCode::OK,
