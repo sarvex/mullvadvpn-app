@@ -1,5 +1,6 @@
 package net.mullvad.mullvadvpn.ui.customdns
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView.Adapter
@@ -60,6 +61,9 @@ class CustomDnsAdapter(val customDns: CustomDns) : Adapter<CustomDnsItemHolder>(
     init {
         customDns.apply {
             onDnsServersChanged.subscribe(this) { dnsServers ->
+                if (dnsServers.count() == 0) {
+                    customDns.disable()
+                }
                 jobTracker.newUiJob("updateDnsServers") {
                     customDnsServersLock.withLock {
                         activeCustomDnsServers = dnsServers
@@ -136,6 +140,11 @@ class CustomDnsAdapter(val customDns: CustomDns) : Adapter<CustomDnsItemHolder>(
     }
 
     fun onDestroy() {
+        // TODO: Handle better as this cache can potentially be out-of-date.
+        if(cachedCustomDnsServers.count() == 0) {
+            customDns.disable()
+        }
+
         customDns.apply {
             onDnsServersChanged.unsubscribe(this)
             onEnabledChanged.unsubscribe(this)
@@ -187,6 +196,13 @@ class CustomDnsAdapter(val customDns: CustomDns) : Adapter<CustomDnsItemHolder>(
     }
 
     fun stopEditing() {
+        Log.v("mullvad", "stopEditing")
+
+        // TODO: Handle better as this cache can potentially be out-of-date.
+        if(cachedCustomDnsServers.count() == 0) {
+            customDns.disable()
+        }
+
         jobTracker.newUiJob("stopEditing") {
             customDnsServersLock.withLock {
                 if (enabled) {
@@ -197,6 +213,13 @@ class CustomDnsAdapter(val customDns: CustomDns) : Adapter<CustomDnsItemHolder>(
     }
 
     fun stopEditing(address: InetAddress) {
+        Log.v("mullvad", "stopEditing: $address")
+
+        // TODO: Handle better as this cache can potentially be out-of-date.
+        if(cachedCustomDnsServers.count() == 0) {
+            customDns.disable()
+        }
+
         jobTracker.newUiJob("stopEditing $address") {
             customDnsServersLock.withLock {
                 if (enabled) {

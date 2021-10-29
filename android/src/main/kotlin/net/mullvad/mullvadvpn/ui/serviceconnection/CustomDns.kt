@@ -21,6 +21,7 @@ class CustomDns(private val connection: Messenger, private val settingsListener:
     }
 
     fun enable() {
+        // TODO: We should probably avoid enabling custom dns before any servers have been added to the list.
         connection.send(Request.SetEnableCustomDns(true).message)
     }
 
