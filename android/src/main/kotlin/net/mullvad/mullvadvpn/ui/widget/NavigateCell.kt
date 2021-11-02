@@ -2,7 +2,9 @@ package net.mullvad.mullvadvpn.ui.widget
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import kotlin.reflect.KClass
@@ -43,6 +45,9 @@ open class NavigateCell : Cell {
     private fun openSubFragment() {
         targetFragment?.let { fragmentClass ->
             val fragment = fragmentClass.java.getConstructor().newInstance()
+
+            val ime = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            ime.hideSoftInputFromWindow(rootView.windowToken, 0)
 
             (context as? FragmentActivity)?.supportFragmentManager?.beginTransaction()?.apply {
                 setCustomAnimations(

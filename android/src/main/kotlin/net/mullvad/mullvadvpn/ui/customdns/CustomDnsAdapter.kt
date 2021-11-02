@@ -114,6 +114,7 @@ class CustomDnsAdapter(val customDns: CustomDns) : Adapter<CustomDnsItemHolder>(
             }
             ViewTypes.EDIT_SERVER -> {
                 val view = inflater.inflate(R.layout.edit_custom_dns_server, parentView, false)
+                parentView.context
                 return EditCustomDnsServerHolder(view, this)
             }
             ViewTypes.SHOW_SERVER -> {
@@ -169,6 +170,7 @@ class CustomDnsAdapter(val customDns: CustomDns) : Adapter<CustomDnsItemHolder>(
                     if (!validAddress) {
                         errorCallback()
                     }
+
                 }
             }
         }

@@ -34,7 +34,6 @@ class AdvancedFragment : ServiceDependentFragment(OnNoService.GoBack) {
         val view = inflater.inflate(R.layout.advanced, container, false)
 
         view.findViewById<View>(R.id.back).setOnClickListener {
-            customDnsAdapter.stopEditing()
             parentActivity.onBackPressed()
         }
 
@@ -61,13 +60,11 @@ class AdvancedFragment : ServiceDependentFragment(OnNoService.GoBack) {
             )
         }
 
-        attachBackButtonHandler()
 
         return view
     }
 
     override fun onSafelyDestroyView() {
-        detachBackButtonHandler()
         customDnsAdapter.onDestroy()
         titleController.onDestroy()
         settingsListener.settingsNotifier.unsubscribe(this)
@@ -135,31 +132,11 @@ class AdvancedFragment : ServiceDependentFragment(OnNoService.GoBack) {
         val confirmation = CompletableDeferred<Boolean>()
         val transaction = parentFragmentManager.beginTransaction()
 
-        detachBackButtonHandler()
         transaction.addToBackStack(null)
 
         ConfirmDnsDialogFragment(confirmation)
             .show(transaction, null)
 
-        val result = confirmation.await()
-
-        attachBackButtonHandler()
-
-        return result
-    }
-
-    private fun attachBackButtonHandler() {
-        parentActivity.backButtonHandler = {
-            if (customDnsAdapter.isEditing) {
-                customDnsAdapter.stopEditing()
-                true
-            } else {
-                false
-            }
-        }
-    }
-
-    private fun detachBackButtonHandler() {
-        parentActivity.backButtonHandler = null
+        return confirmation.await()
     }
 }

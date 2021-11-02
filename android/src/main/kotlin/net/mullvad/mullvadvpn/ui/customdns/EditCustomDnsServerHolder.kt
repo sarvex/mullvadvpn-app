@@ -26,9 +26,8 @@ class EditCustomDnsServerHolder(
     private val input: EditText = view.findViewById<EditText>(R.id.input).apply {
         onFocusChangeListener = OnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
-                serverAddress?.let { address ->
-                    adapter.stopEditing(address)
-                }
+                // TODO: Fix issue with keyboard still visible after switching to ST fragment.
+                saveDnsServer()
             }
         }
 
