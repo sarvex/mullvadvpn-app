@@ -29,6 +29,7 @@ use crate::https_client_with_sni::HttpsConnectorWithSni;
 pub use crate::https_client_with_sni::SocketBypassRequest;
 mod tcp_stream;
 
+mod access;
 mod address_cache;
 mod relay_list;
 pub use address_cache::{AddressCache, CurrentAddressChangeListener};
@@ -263,16 +264,19 @@ impl AccountsProxy {
         account: AccountToken,
     ) -> impl Future<Output = Result<DateTime<Utc>, rest::Error>> {
         let service = self.handle.service.clone();
-
-        let response = rest::send_request(
-            &self.handle.factory,
-            service,
-            "accounts/v1-alpha/accounts/me/",
-            Method::GET,
-            Some(account),
-            StatusCode::OK,
-        );
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
         async move {
+            let access_token = access_proxy.get_token(&account).await?;
+            let response = rest::send_request(
+                &factory,
+                service,
+                "accounts/v1-alpha/accounts/me/",
+                Method::GET,
+                Some(access_token),
+                StatusCode::OK,
+            );
+
             let account: AccountResponse = rest::deserialize_body(response.await?).await?;
             Ok(account.expiry)
         }
@@ -306,19 +310,23 @@ impl AccountsProxy {
         }
 
         let service = self.handle.service.clone();
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
         let submission = VoucherSubmission { voucher_code };
 
-        let response = rest::send_json_request(
-            &self.handle.factory,
-            service,
-            "app/v1/submit-voucher",
-            Method::POST,
-            &submission,
-            Some(account_token),
-            StatusCode::OK,
-        );
-
-        async move { rest::deserialize_body(response.await?).await }
+        async move {
+            let access_token = access_proxy.get_token(&account_token).await?;
+            let response = rest::send_json_request(
+                &factory,
+                service,
+                "app/v1/submit-voucher",
+                Method::POST,
+                &submission,
+                Some(access_token),
+                StatusCode::OK,
+            );
+            rest::deserialize_body(response.await?).await
+        }
     }
 
     pub fn get_www_auth_token(
@@ -331,16 +339,19 @@ impl AccountsProxy {
         }
 
         let service = self.handle.service.clone();
-        let response = rest::send_request(
-            &self.handle.factory,
-            service,
-            "app/v1/www-auth-token",
-            Method::POST,
-            Some(account),
-            StatusCode::OK,
-        );
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
 
         async move {
+            let access_token = access_proxy.get_token(&account).await?;
+            let response = rest::send_request(
+                &factory,
+                service,
+                "app/v1/www-auth-token",
+                Method::POST,
+                Some(access_token),
+                StatusCode::OK,
+            );
             let response: AuthTokenResponse = rest::deserialize_body(response.await?).await?;
             Ok(response.auth_token)
         }
@@ -387,18 +398,22 @@ impl DevicesProxy {
         };
 
         let service = self.handle.service.clone();
-        let response = rest::send_json_request(
-            &self.handle.factory,
-            service,
-            // TODO: Configurable prefix. Lazy static?
-            "accounts/v1-alpha/devices/",
-            Method::POST,
-            &submission,
-            Some(account),
-            StatusCode::CREATED,
-        );
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
 
         async move {
+            let access_token = access_proxy.get_token(&account).await?;
+            let response = rest::send_json_request(
+                &factory,
+                service,
+                // TODO: Configurable prefix. Lazy static?
+                "accounts/v1-alpha/devices/",
+                Method::POST,
+                &submission,
+                Some(access_token),
+                StatusCode::CREATED,
+            );
+
             let response: DeviceResponse = rest::deserialize_body(response.await?).await?;
             let DeviceResponse {
                 id,
@@ -425,19 +440,24 @@ impl DevicesProxy {
         id: DeviceId,
     ) -> impl Future<Output = Result<Device, rest::Error>> {
         let service = self.handle.service.clone();
-        let response = rest::send_request(
-            &self.handle.factory,
-            service,
-            &format!(
-                // TODO: Configurable prefix. Lazy static?
-                "accounts/v1-alpha/devices/{}/",
-                id,
-            ),
-            Method::GET,
-            Some(account),
-            StatusCode::OK,
-        );
-        async move { rest::deserialize_body(response.await?).await }
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
+        async move {
+            let access_token = access_proxy.get_token(&account).await?;
+            let response = rest::send_request(
+                &factory,
+                service,
+                &format!(
+                    // TODO: Configurable prefix. Lazy static?
+                    "accounts/v1-alpha/devices/{}/",
+                    id,
+                ),
+                Method::GET,
+                Some(access_token),
+                StatusCode::OK,
+            );
+            rest::deserialize_body(response.await?).await
+        }
     }
 
     pub fn list(
@@ -445,16 +465,21 @@ impl DevicesProxy {
         account: AccountToken,
     ) -> impl Future<Output = Result<Vec<Device>, rest::Error>> {
         let service = self.handle.service.clone();
-        let response = rest::send_request(
-            &self.handle.factory,
-            service,
-            // TODO: Configurable prefix. Lazy static?
-            "accounts/v1-alpha/devices/",
-            Method::GET,
-            Some(account),
-            StatusCode::OK,
-        );
-        async move { rest::deserialize_body(response.await?).await }
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
+        async move {
+            let access_token = access_proxy.get_token(&account).await?;
+            let response = rest::send_request(
+                &factory,
+                service,
+                // TODO: Configurable prefix. Lazy static?
+                "accounts/v1-alpha/devices/",
+                Method::GET,
+                Some(access_token),
+                StatusCode::OK,
+            );
+            rest::deserialize_body(response.await?).await
+        }
     }
 
     pub fn remove(
@@ -463,19 +488,23 @@ impl DevicesProxy {
         id: DeviceId,
     ) -> impl Future<Output = Result<(), rest::Error>> {
         let service = self.handle.service.clone();
-        let response = rest::send_request(
-            &self.handle.factory,
-            service,
-            &format!(
-                // TODO: Configurable prefix. Lazy static?
-                "accounts/v1-alpha/devices/{}/",
-                id,
-            ),
-            Method::DELETE,
-            Some(account),
-            StatusCode::NO_CONTENT,
-        );
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
         async move {
+            let access_token = access_proxy.get_token(&account).await?;
+            let response = rest::send_request(
+                &factory,
+                service,
+                &format!(
+                    // TODO: Configurable prefix. Lazy static?
+                    "accounts/v1-alpha/devices/{}/",
+                    id,
+                ),
+                Method::DELETE,
+                Some(access_token),
+                StatusCode::NO_CONTENT,
+            );
+
             response.await?;
             Ok(())
         }
@@ -495,21 +524,25 @@ impl DevicesProxy {
         let req_body = RotateDevicePubkey { pubkey };
 
         let service = self.handle.service.clone();
-        let response = rest::send_json_request(
-            &self.handle.factory,
-            service,
-            &format!(
-                // TODO: Configurable prefix. Lazy static?
-                "accounts/v1-alpha/devices/{}/pubkey/",
-                id,
-            ),
-            Method::PUT,
-            &req_body,
-            Some(account),
-            StatusCode::OK,
-        );
+        let factory = self.handle.factory.clone();
+        let access_proxy = self.handle.token_store.clone();
 
         async move {
+            let access_token = access_proxy.get_token(&account).await?;
+            let response = rest::send_json_request(
+                &factory,
+                service,
+                &format!(
+                    // TODO: Configurable prefix. Lazy static?
+                    "accounts/v1-alpha/devices/{}/pubkey/",
+                    id,
+                ),
+                Method::PUT,
+                &req_body,
+                Some(access_token),
+                StatusCode::OK,
+            );
+
             let updated_device: DeviceResponse = rest::deserialize_body(response.await?).await?;
             let DeviceResponse {
                 ipv4_address,
