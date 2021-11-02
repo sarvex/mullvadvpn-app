@@ -1106,6 +1106,7 @@ mod tests {
                 ipv6_gateway: None,
                 mtu: 0,
                 use_wireguard_nt: true,
+                obfuscator_config: None,
             }
         };
         static ref WG_STRUCT_CONFIG: Interface = Interface {
