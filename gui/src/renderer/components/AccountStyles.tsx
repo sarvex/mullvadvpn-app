@@ -47,6 +47,12 @@ export const AccountRowValue = styled(AccountRowText)({
   color: colors.white,
 });
 
+export const DeviceRowValue = styled(AccountRowValue)({
+  ':first-letter': {
+    textTransform: 'uppercase',
+  },
+});
+
 export const AccountOutOfTime = styled(AccountRowValue)({
   color: colors.red,
 });
