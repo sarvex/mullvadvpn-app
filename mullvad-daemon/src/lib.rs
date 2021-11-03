@@ -82,6 +82,9 @@ const TUNNEL_STATE_MACHINE_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 /// Delay between generating a new WireGuard key and reconnecting
 const WG_RECONNECT_DELAY: Duration = Duration::from_secs(4 * 60);
 
+/// Validate the current device after this number of failed connection attempts.
+const WG_DEVICE_CHECK_THRESHOLD: usize = 2;
+
 const DNS_AD_BLOCKING_SERVERS: [IpAddr; 1] = [IpAddr::V4(Ipv4Addr::new(100, 64, 0, 1))];
 const DNS_TRACKER_BLOCKING_SERVERS: [IpAddr; 1] = [IpAddr::V4(Ipv4Addr::new(100, 64, 0, 2))];
 const DNS_AD_TRACKER_BLOCKING_SERVERS: [IpAddr; 1] = [IpAddr::V4(Ipv4Addr::new(100, 64, 0, 3))];
@@ -548,6 +551,7 @@ pub struct Daemon<L: EventListener> {
     settings: SettingsPersister,
     account_history: account_history::AccountHistory,
     account_manager: device::AccountManager,
+    wg_retry_attempt: usize,
     rpc_runtime: mullvad_rpc::MullvadRpcRuntime,
     rpc_handle: mullvad_rpc::rest::MullvadRestHandle,
     version_updater_handle: version_check::VersionUpdaterHandle,
@@ -786,6 +790,7 @@ where
             settings,
             account_history,
             account_manager,
+            wg_retry_attempt: 0,
             rpc_runtime,
             rpc_handle,
             version_updater_handle,
@@ -1094,6 +1099,9 @@ where
         let tunnel_options = self.settings.tunnel_options.clone();
         let location = relay.location.as_ref().expect("Relay has no location set");
         self.last_generated_bridge_relay = None;
+        if retry_attempt == 0 {
+            self.wg_retry_attempt = 0;
+        }
         match endpoint {
             MullvadEndpoint::OpenVpn(endpoint) => {
                 let proxy_settings = match &self.settings.bridge_settings {
@@ -1163,6 +1171,22 @@ where
                 ipv4_gateway,
                 ipv6_gateway,
             } => {
+                if self.wg_retry_attempt == WG_DEVICE_CHECK_THRESHOLD {
+                    match self.account_manager.validate_device().await {
+                        Ok(false) => {
+                            self.event_listener.notify_device_event(DeviceEvent(None));
+                        }
+                        Err(error) => {
+                            log::error!(
+                                "{}",
+                                error.display_chain_with_msg("Failed to check device validity")
+                            );
+                        }
+                        _ => (),
+                    }
+                }
+                self.wg_retry_attempt += 1;
+
                 let wg_data = self
                     .account_manager
                     .get()
