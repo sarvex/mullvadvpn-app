@@ -248,6 +248,31 @@ impl AccountManager {
         }
     }
 
+    /// Check if the device is valid for the account, and yank it if it no longer exists.
+    /// If the device is invalid, it is removed and `Ok(false)` is returned.
+    pub async fn validate_device(&mut self) -> Result<bool, Error> {
+        let data = {
+            let inner = self.inner.lock().unwrap();
+            inner.data.as_ref().ok_or(Error::NoDevice)?.clone()
+        };
+
+        match self.device_service.get(data.token, data.device.id).await {
+            Ok(_) => {
+                log::debug!("The current device is still valid");
+                Ok(true)
+            }
+            Err(Error::InvalidAccount) | Err(Error::InvalidDevice) => {
+                log::debug!("The current device is no longer valid on this account");
+                {
+                    self.inner.lock().unwrap().data.take();
+                    let _ = self.cache_update_tx.unbounded_send(None);
+                }
+                Ok(false)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     fn start_key_rotation(&mut self) {
         self.stop_key_rotation();
 
@@ -564,6 +589,19 @@ impl DeviceService {
             },
             should_retry_backoff,
             retry_strategy,
+        )
+        .await
+        .map_err(map_rest_error)
+    }
+
+    pub async fn get(&self, token: AccountToken, device: DeviceId) -> Result<Device, Error> {
+        let proxy = self.proxy.clone();
+        let api_handle = self.api_availability.clone();
+        retry_future_n(
+            move || proxy.get(token.clone(), device.clone()),
+            move |result| should_retry(result, &api_handle),
+            constant_interval(RETRY_ACTION_INTERVAL),
+            RETRY_ACTION_MAX_RETRIES,
         )
         .await
         .map_err(map_rest_error)
