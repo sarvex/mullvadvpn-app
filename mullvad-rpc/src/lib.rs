@@ -271,7 +271,7 @@ impl AccountsProxy {
             let response = rest::send_request(
                 &factory,
                 service,
-                "accounts/v1-alpha/accounts/me/",
+                "accounts/v1-alpha/accounts/me",
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
@@ -287,7 +287,7 @@ impl AccountsProxy {
         let response = rest::send_request(
             &self.handle.factory,
             service,
-            "accounts/v1-alpha/accounts/",
+            "accounts/v1-alpha/accounts",
             Method::POST,
             None,
             StatusCode::CREATED,
@@ -407,7 +407,7 @@ impl DevicesProxy {
                 &factory,
                 service,
                 // TODO: Configurable prefix. Lazy static?
-                "accounts/v1-alpha/devices/",
+                "accounts/v1-alpha/devices",
                 Method::POST,
                 &submission,
                 Some(access_token),
@@ -449,7 +449,7 @@ impl DevicesProxy {
                 service,
                 &format!(
                     // TODO: Configurable prefix. Lazy static?
-                    "accounts/v1-alpha/devices/{}/",
+                    "accounts/v1-alpha/devices/{}",
                     id,
                 ),
                 Method::GET,
@@ -473,7 +473,7 @@ impl DevicesProxy {
                 &factory,
                 service,
                 // TODO: Configurable prefix. Lazy static?
-                "accounts/v1-alpha/devices/",
+                "accounts/v1-alpha/devices",
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
@@ -497,7 +497,7 @@ impl DevicesProxy {
                 service,
                 &format!(
                     // TODO: Configurable prefix. Lazy static?
-                    "accounts/v1-alpha/devices/{}/",
+                    "accounts/v1-alpha/devices/{}",
                     id,
                 ),
                 Method::DELETE,
@@ -534,7 +534,7 @@ impl DevicesProxy {
                 service,
                 &format!(
                     // TODO: Configurable prefix. Lazy static?
-                    "accounts/v1-alpha/devices/{}/pubkey/",
+                    "accounts/v1-alpha/devices/{}/pubkey",
                     id,
                 ),
                 Method::PUT,
