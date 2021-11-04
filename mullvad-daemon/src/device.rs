@@ -440,10 +440,10 @@ impl DeviceService {
         let token_copy = token.clone();
         let (device, addresses) = retry_future(
             move || {
-                let wait_online = api_handle.wait_online();
+                let wait_available = api_handle.wait_available();
                 let fut = proxy.create(token_copy.clone(), pubkey.clone());
                 async move {
-                    let _ = wait_online.await;
+                    let _ = wait_available.await;
                     fut.await
                 }
             },
@@ -495,10 +495,10 @@ impl DeviceService {
 
         retry_future(
             move || {
-                let wait_online = api_handle.wait_online();
+                let wait_available = api_handle.wait_available();
                 let fut = proxy.remove(token.clone(), device.clone());
                 async move {
-                    let _ = wait_online.await;
+                    let _ = wait_available.await;
                     fut.await
                 }
             },
@@ -557,10 +557,10 @@ impl DeviceService {
         );
         let addresses = retry_future(
             move || {
-                let wait_online = api_handle.wait_online();
+                let wait_available = api_handle.wait_available();
                 let fut = proxy.replace_wg_key(token.clone(), device.clone(), pubkey.clone());
                 async move {
-                    let _ = wait_online.await;
+                    let _ = wait_available.await;
                     fut.await
                 }
             },
@@ -606,10 +606,10 @@ impl DeviceService {
         );
         retry_future(
             move || {
-                let wait_online = api_handle.wait_online();
+                let wait_available = api_handle.wait_available();
                 let fut = proxy.list(token.clone());
                 async move {
-                    let _ = wait_online.await;
+                    let _ = wait_available.await;
                     fut.await
                 }
             },
