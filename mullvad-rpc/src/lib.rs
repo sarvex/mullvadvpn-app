@@ -48,6 +48,9 @@ pub const INVALID_ACCOUNT: &str = "INVALID_ACCOUNT";
 /// Error code returned by the Mullvad API if the access token is invalid.
 pub const INVALID_ACCESS_TOKEN: &str = "INVALID_ACCESS_TOKEN";
 
+pub const MAX_DEVICES_REACHED: &str = "MAX_DEVICES_REACHED";
+pub const PUBKEY_IN_USE: &str = "PUBKEY_IN_USE";
+
 pub const API_IP_CACHE_FILENAME: &str = "api-ip-address.txt";
 const API_HOST_DEFAULT: &str = "api.mullvad.net";
 const API_IP_DEFAULT: IpAddr = IpAddr::V4(Ipv4Addr::new(193, 138, 218, 78));
@@ -363,8 +366,6 @@ impl AccountsProxy {
         }
     }
 }
-
-pub const MAX_DEVICES_REACHED: &str = "MAX_DEVICES_REACHED";
 
 #[derive(Clone)]
 pub struct DevicesProxy {
