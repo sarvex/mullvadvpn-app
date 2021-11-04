@@ -427,28 +427,13 @@ impl DeviceService {
         let private_key = PrivateKey::new_from_random();
         let pubkey = private_key.public_key();
 
-        let retry_strategy = Jittered::jitter(
-            ExponentialBackoff::new(
-                RETRY_BACKOFF_INTERVAL_INITIAL,
-                RETRY_BACKOFF_INTERVAL_FACTOR,
-            )
-            .max_delay(RETRY_BACKOFF_INTERVAL_MAX),
-        );
-
         let proxy = self.proxy.clone();
         let api_handle = self.api_availability.clone();
         let token_copy = token.clone();
         let (device, addresses) = retry_future(
-            move || {
-                let wait_available = api_handle.wait_available();
-                let fut = proxy.create(token_copy.clone(), pubkey.clone());
-                async move {
-                    let _ = wait_available.await;
-                    fut.await
-                }
-            },
+            move || api_handle.when_bg_resumes(proxy.create(token_copy.clone(), pubkey.clone())),
             should_retry_backoff,
-            retry_strategy,
+            retry_strategy(),
         )
         .await
         .map_err(map_rest_error)?;
@@ -494,14 +479,7 @@ impl DeviceService {
         );
 
         retry_future(
-            move || {
-                let wait_available = api_handle.wait_available();
-                let fut = proxy.remove(token.clone(), device.clone());
-                async move {
-                    let _ = wait_available.await;
-                    fut.await
-                }
-            },
+            move || api_handle.when_bg_resumes(proxy.remove(token.clone(), device.clone())),
             should_retry_backoff,
             retry_strategy,
         )
@@ -548,24 +526,16 @@ impl DeviceService {
         let api_handle = self.api_availability.clone();
         let pubkey = private_key.public_key();
 
-        let retry_strategy = Jittered::jitter(
-            ExponentialBackoff::new(
-                RETRY_BACKOFF_INTERVAL_INITIAL,
-                RETRY_BACKOFF_INTERVAL_FACTOR,
-            )
-            .max_delay(RETRY_BACKOFF_INTERVAL_MAX),
-        );
         let addresses = retry_future(
             move || {
-                let wait_available = api_handle.wait_available();
-                let fut = proxy.replace_wg_key(token.clone(), device.clone(), pubkey.clone());
-                async move {
-                    let _ = wait_available.await;
-                    fut.await
-                }
+                api_handle.when_bg_resumes(proxy.replace_wg_key(
+                    token.clone(),
+                    device.clone(),
+                    pubkey.clone(),
+                ))
             },
             should_retry_backoff,
-            retry_strategy,
+            retry_strategy(),
         )
         .await
         .map_err(map_rest_error)?;
@@ -597,24 +567,10 @@ impl DeviceService {
         let proxy = self.proxy.clone();
         let api_handle = self.api_availability.clone();
 
-        let retry_strategy = Jittered::jitter(
-            ExponentialBackoff::new(
-                RETRY_BACKOFF_INTERVAL_INITIAL,
-                RETRY_BACKOFF_INTERVAL_FACTOR,
-            )
-            .max_delay(RETRY_BACKOFF_INTERVAL_MAX),
-        );
         retry_future(
-            move || {
-                let wait_available = api_handle.wait_available();
-                let fut = proxy.list(token.clone());
-                async move {
-                    let _ = wait_available.await;
-                    fut.await
-                }
-            },
+            move || api_handle.when_bg_resumes(proxy.list(token.clone())),
             should_retry_backoff,
-            retry_strategy,
+            retry_strategy(),
         )
         .await
         .map_err(map_rest_error)
@@ -792,24 +748,14 @@ impl Account {
                 return;
             };
 
-            let retry_strategy = Jittered::jitter(
-                ExponentialBackoff::new(
-                    RETRY_BACKOFF_INTERVAL_INITIAL,
-                    RETRY_BACKOFF_INTERVAL_FACTOR,
-                )
-                .max_delay(RETRY_BACKOFF_INTERVAL_MAX),
-            );
             let future_generator = move || {
-                let wait_online = api_availability.wait_online();
-                let expiry_fut = accounts_proxy.get_expiry(token.clone());
+                let expiry_fut =
+                    api_availability.when_online(accounts_proxy.get_expiry(token.clone()));
                 let api_availability_copy = api_availability.clone();
-                async move {
-                    let _ = wait_online.await;
-                    handle_expiry_result_inner(&expiry_fut.await, &api_availability_copy)
-                }
+                async move { handle_expiry_result_inner(&expiry_fut.await, &api_availability_copy) }
             };
             let should_retry = move |state_was_updated: &bool| -> bool { !*state_was_updated };
-            retry_future(future_generator, should_retry, retry_strategy).await;
+            retry_future(future_generator, should_retry, retry_strategy()).await;
         });
         runtime.spawn(future);
 
@@ -882,4 +828,14 @@ fn map_rest_error(error: rest::Error) -> Error {
         }
         error => Error::OtherRestError(error),
     }
+}
+
+fn retry_strategy() -> Jittered<ExponentialBackoff> {
+    Jittered::jitter(
+        ExponentialBackoff::new(
+            RETRY_BACKOFF_INTERVAL_INITIAL,
+            RETRY_BACKOFF_INTERVAL_FACTOR,
+        )
+        .max_delay(RETRY_BACKOFF_INTERVAL_MAX),
+    )
 }
