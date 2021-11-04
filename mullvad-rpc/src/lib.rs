@@ -45,8 +45,8 @@ pub const INVALID_VOUCHER: &str = "INVALID_VOUCHER";
 /// Error code returned by the Mullvad API if the account token is invalid.
 pub const INVALID_ACCOUNT: &str = "INVALID_ACCOUNT";
 
-/// Error code returned by the Mullvad API if the account token is missing or invalid.
-pub const INVALID_AUTH: &str = "INVALID_AUTH";
+/// Error code returned by the Mullvad API if the access token is invalid.
+pub const INVALID_ACCESS_TOKEN: &str = "INVALID_ACCESS_TOKEN";
 
 pub const API_IP_CACHE_FILENAME: &str = "api-ip-address.txt";
 const API_HOST_DEFAULT: &str = "api.mullvad.net";
@@ -275,9 +275,11 @@ impl AccountsProxy {
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
-            );
+            )
+            .await;
+            access_proxy.check_response(&account, &response);
 
-            let account: AccountResponse = rest::deserialize_body(response.await?).await?;
+            let account: AccountResponse = rest::deserialize_body(response?).await?;
             Ok(account.expiry)
         }
     }
@@ -324,8 +326,10 @@ impl AccountsProxy {
                 &submission,
                 Some(access_token),
                 StatusCode::OK,
-            );
-            rest::deserialize_body(response.await?).await
+            )
+            .await;
+            access_proxy.check_response(&account_token, &response);
+            rest::deserialize_body(response?).await
         }
     }
 
@@ -351,8 +355,10 @@ impl AccountsProxy {
                 Method::POST,
                 Some(access_token),
                 StatusCode::OK,
-            );
-            let response: AuthTokenResponse = rest::deserialize_body(response.await?).await?;
+            )
+            .await;
+            access_proxy.check_response(&account, &response);
+            let response: AuthTokenResponse = rest::deserialize_body(response?).await?;
             Ok(response.auth_token)
         }
     }
@@ -412,9 +418,11 @@ impl DevicesProxy {
                 &submission,
                 Some(access_token),
                 StatusCode::CREATED,
-            );
+            )
+            .await;
+            access_proxy.check_response(&account, &response);
 
-            let response: DeviceResponse = rest::deserialize_body(response.await?).await?;
+            let response: DeviceResponse = rest::deserialize_body(response?).await?;
             let DeviceResponse {
                 id,
                 name,
@@ -455,8 +463,10 @@ impl DevicesProxy {
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
-            );
-            rest::deserialize_body(response.await?).await
+            )
+            .await;
+            access_proxy.check_response(&account, &response);
+            rest::deserialize_body(response?).await
         }
     }
 
@@ -477,8 +487,10 @@ impl DevicesProxy {
                 Method::GET,
                 Some(access_token),
                 StatusCode::OK,
-            );
-            rest::deserialize_body(response.await?).await
+            )
+            .await;
+            access_proxy.check_response(&account, &response);
+            rest::deserialize_body(response?).await
         }
     }
 
@@ -503,9 +515,11 @@ impl DevicesProxy {
                 Method::DELETE,
                 Some(access_token),
                 StatusCode::NO_CONTENT,
-            );
+            )
+            .await;
+            access_proxy.check_response(&account, &response);
 
-            response.await?;
+            response?;
             Ok(())
         }
     }
@@ -541,9 +555,11 @@ impl DevicesProxy {
                 &req_body,
                 Some(access_token),
                 StatusCode::OK,
-            );
+            )
+            .await;
+            access_proxy.check_response(&account, &response);
 
-            let updated_device: DeviceResponse = rest::deserialize_body(response.await?).await?;
+            let updated_device: DeviceResponse = rest::deserialize_body(response?).await?;
             let DeviceResponse {
                 ipv4_address,
                 ipv6_address,
