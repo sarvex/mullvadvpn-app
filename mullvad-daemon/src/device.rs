@@ -860,6 +860,7 @@ fn should_retry_backoff<T>(result: &Result<T, RestError>) -> bool {
                 *status != rest::StatusCode::NOT_FOUND
                     && code != mullvad_rpc::INVALID_ACCOUNT
                     && code != mullvad_rpc::MAX_DEVICES_REACHED
+                    && code != mullvad_rpc::PUBKEY_IN_USE
             } else {
                 true
             }
