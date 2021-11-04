@@ -82,8 +82,8 @@ const TUNNEL_STATE_MACHINE_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 /// Delay between generating a new WireGuard key and reconnecting
 const WG_RECONNECT_DELAY: Duration = Duration::from_secs(4 * 60);
 
-/// Validate the current device after this number of failed connection attempts.
-const WG_DEVICE_CHECK_THRESHOLD: usize = 2;
+/// Validate the current device once for every `WG_DEVICE_CHECK_THRESHOLD` attempts.
+const WG_DEVICE_CHECK_THRESHOLD: usize = 3;
 
 const DNS_AD_BLOCKING_SERVERS: [IpAddr; 1] = [IpAddr::V4(Ipv4Addr::new(100, 64, 0, 1))];
 const DNS_TRACKER_BLOCKING_SERVERS: [IpAddr; 1] = [IpAddr::V4(Ipv4Addr::new(100, 64, 0, 2))];
@@ -555,6 +555,7 @@ pub struct Daemon<L: EventListener> {
     account_history: account_history::AccountHistory,
     account_manager: device::AccountManager,
     wg_retry_attempt: usize,
+    wg_check_validity: bool,
     rpc_runtime: mullvad_rpc::MullvadRpcRuntime,
     rpc_handle: mullvad_rpc::rest::MullvadRestHandle,
     version_updater_handle: version_check::VersionUpdaterHandle,
@@ -794,6 +795,7 @@ where
             account_history,
             account_manager,
             wg_retry_attempt: 0,
+            wg_check_validity: false,
             rpc_runtime,
             rpc_handle,
             version_updater_handle,
@@ -1104,6 +1106,7 @@ where
         self.last_generated_bridge_relay = None;
         if retry_attempt == 0 {
             self.wg_retry_attempt = 0;
+            self.wg_check_validity = true;
         }
         match endpoint {
             MullvadEndpoint::OpenVpn(endpoint) => {
@@ -1174,21 +1177,35 @@ where
                 ipv4_gateway,
                 ipv6_gateway,
             } => {
-                if self.wg_retry_attempt == WG_DEVICE_CHECK_THRESHOLD {
+                self.wg_retry_attempt += 1;
+                if self.wg_check_validity && self.wg_retry_attempt % WG_DEVICE_CHECK_THRESHOLD == 0
+                {
                     match self.account_manager.validate_device().await {
-                        Ok(false) => {
-                            self.event_listener.notify_device_event(DeviceEvent(None));
+                        Ok(status) => {
+                            match status {
+                                device::ValidationResult::Valid => (),
+                                device::ValidationResult::Removed => {
+                                    self.event_listener.notify_device_event(DeviceEvent(None));
+                                }
+                                device::ValidationResult::RotatedKey(_) => {
+                                    self.event_listener.notify_device_event(DeviceEvent::from(
+                                        self.account_manager.get(),
+                                    ));
+                                }
+                            }
+                            self.wg_check_validity = false;
                         }
                         Err(error) => {
                             log::error!(
                                 "{}",
                                 error.display_chain_with_msg("Failed to check device validity")
                             );
+                            if !error.is_network_error() {
+                                self.wg_check_validity = false;
+                            }
                         }
-                        _ => (),
                     }
                 }
-                self.wg_retry_attempt += 1;
 
                 let wg_data = self
                     .account_manager
