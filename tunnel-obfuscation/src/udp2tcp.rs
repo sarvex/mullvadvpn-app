@@ -8,9 +8,9 @@ use udp_over_tcp::{
 };
 
 pub struct Udp2TcpSettings {
-    peer: SocketAddr,
+    pub peer: SocketAddr,
     #[cfg(target_os = "linux")]
-    fwmark: Option<u32>,
+    pub fwmark: Option<u32>,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -78,7 +78,7 @@ impl Obfuscator for Udp2Tcp {
         }
     }
 
-    async fn run(self) -> crate::Result<()> {
+    async fn run(self: Box<Self>) -> crate::Result<()> {
         self.instance
             .run()
             .await

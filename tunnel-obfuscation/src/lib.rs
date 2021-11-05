@@ -19,7 +19,7 @@ pub enum Error {
 #[async_trait]
 pub trait Obfuscator {
     fn endpoint(&self) -> Endpoint;
-    async fn run(self) -> Result<()>;
+    async fn run(self: Box<Self>) -> Result<()>;
 }
 
 pub enum Settings {
