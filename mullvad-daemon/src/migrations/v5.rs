@@ -19,12 +19,12 @@ pub(crate) async fn migrate(
 
     log::info!("Migrating settings format to V6");
 
-    if let Some(token) = settings.get("account_token") {
+    if let Some(token) = settings.get("account_token").filter(|t| !t.is_null()) {
         let api_handle = rest_handle.availability.clone();
         let service = DeviceService::new(rest_handle, api_handle);
         let token: AccountToken =
             serde_json::from_value(token.clone()).map_err(Error::ParseError)?;
-        if let Some(wg_data) = settings.get("wireguard") {
+        if let Some(wg_data) = settings.get("wireguard").filter(|wg| !wg.is_null()) {
             let wg_data: WireguardData =
                 serde_json::from_value(wg_data.clone()).map_err(Error::ParseError)?;
             log::info!("Creating a new device cache from previous settings");
