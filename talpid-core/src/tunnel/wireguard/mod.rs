@@ -90,7 +90,26 @@ pub struct WireguardMonitor {
     #[cfg(target_os = "windows")]
     stop_setup_tx: Option<futures::channel::oneshot::Sender<()>>,
     pinger_stop_sender: mpsc::Sender<()>,
-    _obfuscator_abort_handle: Option<FutureAbortHandle>,
+    _obfuscator: Option<ObfuscatorHandle>,
+}
+
+/// Simple wrapper that automatically cancels the future which runs an obfuscator.
+struct ObfuscatorHandle {
+    abort_handle: FutureAbortHandle,
+}
+
+impl ObfuscatorHandle {
+    pub fn new(abort_handle: FutureAbortHandle) -> Self {
+        Self {
+            abort_handle,
+        }
+    }
+}
+
+impl Drop for ObfuscatorHandle {
+    pub fn drop(&mut self) {
+        self.abort_handle.abort();
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -109,7 +128,7 @@ fn maybe_create_obfuscator(
     runtime: &tokio::runtime::Handle,
     config: &mut Config,
     close_msg_sender: mpsc::Sender<CloseMsg>,
-) -> Result<Option<FutureAbortHandle>> {
+) -> Result<Option<ObfuscatorHandle>> {
     // TODO: FIXFIXFIX
     // There are one or two peers.
     // The first one is always the entry relay.
@@ -135,7 +154,7 @@ fn maybe_create_obfuscator(
                 let _ = close_msg_sender.send(CloseMsg::Stop);
             });
             runtime.spawn(runner);
-            return Ok(Some(abort_handle));
+            return Ok(Some(ObfuscatorHandle::new(abort_handle)));
         }
     }
     Ok(None)
@@ -165,7 +184,7 @@ impl WireguardMonitor {
             .collect();
         let (close_msg_sender, close_msg_receiver) = mpsc::channel();
 
-        let obfuscator_abort_handle = maybe_create_obfuscator(&runtime, &mut config, close_msg_sender.clone())?;
+        let obfuscator_handle = maybe_create_obfuscator(&runtime, &mut config, close_msg_sender.clone())?;
 
         let tunnel =
             Self::open_tunnel(&config, log_path, resource_dir, tun_provider, route_manager)?;
@@ -186,7 +205,7 @@ impl WireguardMonitor {
             #[cfg(target_os = "windows")]
             stop_setup_tx: Some(stop_setup_tx),
             pinger_stop_sender: pinger_tx,
-            _obfuscator_abort_handle: obfuscator_abort_handle,
+            _obfuscator_handle: obfuscator_handle,
         };
 
         let gateway = config.ipv4_gateway;
