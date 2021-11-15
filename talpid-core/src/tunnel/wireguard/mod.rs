@@ -107,7 +107,7 @@ impl ObfuscatorHandle {
 }
 
 impl Drop for ObfuscatorHandle {
-    pub fn drop(&mut self) {
+    fn drop(&mut self) {
         self.abort_handle.abort();
     }
 }
@@ -139,18 +139,19 @@ fn maybe_create_obfuscator(
                 #[cfg(target_os = "linux")]
                 fwmark: Some(crate::linux::TUNNEL_FW_MARK),
             };
-            let obfs = runtime.block_on(create_obfuscator(&ObfuscationSettings::Udp2Tcp(settings)))
+            let obfuscator = runtime.block_on(create_obfuscator(&ObfuscationSettings::Udp2Tcp(settings)))
                 .map_err(Error::CreateObfuscatorError)?;
-            let ep = obfs.endpoint();
-            first_peer.endpoint = ep.address;
-            first_peer.protocol = ep.protocol;
+            let endpoint = obfuscator.endpoint();
+            first_peer.endpoint = endpoint.address;
+            first_peer.protocol = endpoint.protocol;
             let (runner, abort_handle) = abortable(async move {
-                if let Err(error) = obfs.run().await {
+                if let Err(error) = obfuscator.run().await {
                     log::error!(
                         "{}",
                         error.display_chain_with_msg("Obfuscation controller failed")
                     );
                 }
+                // TODO: Should we send a different message or include the error here, if one exists?
                 let _ = close_msg_sender.send(CloseMsg::Stop);
             });
             runtime.spawn(runner);
@@ -184,7 +185,7 @@ impl WireguardMonitor {
             .collect();
         let (close_msg_sender, close_msg_receiver) = mpsc::channel();
 
-        let obfuscator_handle = maybe_create_obfuscator(&runtime, &mut config, close_msg_sender.clone())?;
+        let obfuscator = maybe_create_obfuscator(&runtime, &mut config, close_msg_sender.clone())?;
 
         let tunnel =
             Self::open_tunnel(&config, log_path, resource_dir, tun_provider, route_manager)?;
@@ -205,7 +206,7 @@ impl WireguardMonitor {
             #[cfg(target_os = "windows")]
             stop_setup_tx: Some(stop_setup_tx),
             pinger_stop_sender: pinger_tx,
-            _obfuscator_handle: obfuscator_handle,
+            _obfuscator: obfuscator,
         };
 
         let gateway = config.ipv4_gateway;
