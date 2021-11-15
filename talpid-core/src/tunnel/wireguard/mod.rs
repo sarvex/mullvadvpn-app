@@ -16,7 +16,9 @@ use std::{
     sync::{mpsc, Arc, Mutex},
 };
 use talpid_types::{net::TransportProtocol, ErrorExt};
-use tunnel_obfuscation::{create_obfuscator, Error as ObfuscationError, Settings as ObfuscationSettings, Udp2TcpSettings};
+use tunnel_obfuscation::{
+    create_obfuscator, Error as ObfuscationError, Settings as ObfuscationSettings, Udp2TcpSettings,
+};
 
 /// WireGuard config data-types
 pub mod config;
@@ -100,9 +102,7 @@ struct ObfuscatorHandle {
 
 impl ObfuscatorHandle {
     pub fn new(abort_handle: FutureAbortHandle) -> Self {
-        Self {
-            abort_handle,
-        }
+        Self { abort_handle }
     }
 }
 
@@ -139,7 +139,8 @@ fn maybe_create_obfuscator(
                 #[cfg(target_os = "linux")]
                 fwmark: Some(crate::linux::TUNNEL_FW_MARK),
             };
-            let obfuscator = runtime.block_on(create_obfuscator(&ObfuscationSettings::Udp2Tcp(settings)))
+            let obfuscator = runtime
+                .block_on(create_obfuscator(&ObfuscationSettings::Udp2Tcp(settings)))
                 .map_err(Error::CreateObfuscatorError)?;
             let endpoint = obfuscator.endpoint();
             first_peer.endpoint = endpoint.address;
@@ -151,7 +152,8 @@ fn maybe_create_obfuscator(
                         error.display_chain_with_msg("Obfuscation controller failed")
                     );
                 }
-                // TODO: Should we send a different message or include the error here, if one exists?
+                // TODO: Should we send a different message or include the error here, if one
+                // exists?
                 let _ = close_msg_sender.send(CloseMsg::Stop);
             });
             runtime.spawn(runner);
@@ -178,11 +180,8 @@ impl WireguardMonitor {
         tun_provider: &mut TunProvider,
         route_manager: &mut routing::RouteManager,
     ) -> Result<WireguardMonitor> {
-        let endpoint_addrs: Vec<IpAddr> = config
-            .peers
-            .iter()
-            .map(|peer| peer.endpoint.ip())
-            .collect();
+        let endpoint_addrs: Vec<IpAddr> =
+            config.peers.iter().map(|peer| peer.endpoint.ip()).collect();
         let (close_msg_sender, close_msg_receiver) = mpsc::channel();
 
         let obfuscator = maybe_create_obfuscator(&runtime, &mut config, close_msg_sender.clone())?;
