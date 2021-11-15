@@ -17,7 +17,7 @@ pub enum Error {
 }
 
 #[async_trait]
-pub trait Obfuscator : Send {
+pub trait Obfuscator: Send {
     fn endpoint(&self) -> Endpoint;
     async fn run(self: Box<Self>) -> Result<()>;
 }
