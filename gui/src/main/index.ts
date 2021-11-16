@@ -629,6 +629,7 @@ class ApplicationMain {
 
     // fetch the latest version info in background
     if (!UPDATE_NOTIFICATION_DISABLED) {
+      log.info('a ------- Fething latest version on Daemon connect');
       void this.fetchLatestVersion();
     }
 
@@ -718,6 +719,7 @@ class ApplicationMain {
         } else if ('wireguardKey' in daemonEvent) {
           this.handleWireguardKeygenEvent(daemonEvent.wireguardKey);
         } else if ('appVersionInfo' in daemonEvent) {
+          log.info('b ------- Received latest version in daemon event');
           this.setLatestVersion(daemonEvent.appVersionInfo);
         }
       },
@@ -831,6 +833,7 @@ class ApplicationMain {
     }
 
     if (oldSettings.showBetaReleases !== newSettings.showBetaReleases) {
+      log.info('c ------- Updating version info due to beta program setting change');
       this.setLatestVersion(this.upgradeVersion);
     }
 
@@ -965,6 +968,8 @@ class ApplicationMain {
 
     this.currentVersion = versionInfo;
 
+    log.info('0 ------- Daemon version:', versionInfo);
+
     if (!versionInfo.isConsistent) {
       log.info('Inconsistent version', {
         guiVersion: versionInfo.gui,
@@ -991,9 +996,16 @@ class ApplicationMain {
       return;
     }
 
+    log.info('1 ------- Version info:', latestVersionInfo);
+
     if (process.platform === 'win32' && parseInt(os.release().split('.')[0]) < 10) {
+      log.info('2 ------- Is Windows < 10');
       latestVersionInfo.suggestedUpgrade = undefined;
+    } else {
+      log.info('3 ------- Is Windows >= 10');
     }
+
+    log.info('4 ------- Updated version info:', latestVersionInfo);
 
     const suggestedIsBeta =
       latestVersionInfo.suggestedUpgrade !== undefined &&

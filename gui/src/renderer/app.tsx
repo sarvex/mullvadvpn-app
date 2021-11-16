@@ -889,6 +889,7 @@ export default class AppRenderer {
   }
 
   private setCurrentVersion(versionInfo: ICurrentAppVersionInfo) {
+    log.info('1 -------- Set current version:', versionInfo);
     this.reduxActions.version.updateVersion(
       versionInfo.gui,
       versionInfo.isConsistent,
@@ -897,6 +898,7 @@ export default class AppRenderer {
   }
 
   private setUpgradeVersion(upgradeVersion: IAppVersionInfo) {
+    log.info('2 -------- Set upgrade version:', upgradeVersion);
     this.reduxActions.version.updateLatest(upgradeVersion);
   }
 

@@ -1,6 +1,7 @@
 import { sprintf } from 'sprintf-js';
 import { links } from '../../config.json';
 import { messages } from '../../shared/gettext';
+import log from '../logging';
 import {
   InAppNotification,
   InAppNotificationProvider,
@@ -18,6 +19,10 @@ export class UpdateAvailableNotificationProvider
   public constructor(private context: UpdateAvailableNotificationContext) {}
 
   public mayDisplay() {
+    log.info(
+      'w --------- UpdateAvailableNotificationProvider mayDisplay, suggestedUpgrade:',
+      this.context.suggestedUpgrade,
+    );
     return this.context.suggestedUpgrade ? true : false;
   }
 

@@ -1,5 +1,6 @@
 import { links } from '../../config.json';
 import { messages } from '../../shared/gettext';
+import log from '../logging';
 import {
   InAppNotification,
   SystemNotification,
@@ -19,6 +20,10 @@ export class UnsupportedVersionNotificationProvider
   public constructor(private context: UnsupportedVersionNotificationContext) {}
 
   public mayDisplay() {
+    log.info(
+      'q --------- UnsupportedVersionNotificationProvider mayDisplay, supported:',
+      this.context.supported,
+    );
     return this.context.consistent && !this.context.supported;
   }
 
