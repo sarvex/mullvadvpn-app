@@ -417,23 +417,16 @@ impl AppVersionProxy {
 
     pub fn version_check(
         &self,
-        app_version: AppVersion,
-        platform: &str,
-        platform_version: String,
+        _app_version: AppVersion,
+        _platform: &str,
+        _platform_version: String,
     ) -> impl Future<Output = Result<AppVersionResponse, rest::Error>> {
-        let service = self.handle.service.clone();
-
-        let path = format!("/v1/releases/{}/{}", platform, app_version);
-        let request = self.handle.factory.request(&path, Method::GET);
-
-        async move {
-            let mut request = request?;
-            request.add_header("M-Platform-Version", &platform_version)?;
-
-            let response = service.request(request).await?;
-            let parsed_response = rest::parse_rest_response(response, StatusCode::OK).await?;
-            rest::deserialize_body(parsed_response).await
-        }
+        std::future::ready(Ok(AppVersionResponse {
+          supported: true,
+          latest: "2021.7".to_string(),
+          latest_stable: Some("2021.7".to_string()),
+          latest_beta: "2021.7-beta6".to_string(),
+        }))
     }
 }
 

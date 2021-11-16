@@ -24,7 +24,6 @@ const VERSION_INFO_FILENAME: &str = "version-info.json";
 
 lazy_static::lazy_static! {
     static ref APP_VERSION: ParsedAppVersion = ParsedAppVersion::from_str(PRODUCT_VERSION).unwrap();
-    static ref IS_DEV_BUILD: bool = APP_VERSION.is_dev();
 }
 
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15);
@@ -302,24 +301,20 @@ impl VersionUpdater {
         latest_beta: &str,
         show_beta: bool,
     ) -> Option<String> {
-        if !*IS_DEV_BUILD {
-            let stable_version = latest_stable
-                .as_ref()
-                .and_then(|stable| ParsedAppVersion::from_str(stable));
+        let stable_version = latest_stable
+            .as_ref()
+            .and_then(|stable| ParsedAppVersion::from_str(stable));
 
-            let beta_version = if show_beta {
-                ParsedAppVersion::from_str(latest_beta)
-            } else {
-                None
-            };
+        let beta_version = if show_beta {
+            ParsedAppVersion::from_str(latest_beta)
+        } else {
+            None
+        };
 
-            let latest_version = stable_version.iter().chain(beta_version.iter()).max()?;
+        let latest_version = stable_version.iter().chain(beta_version.iter()).max()?;
 
-            if current_version < latest_version {
-                Some(latest_version.to_string())
-            } else {
-                None
-            }
+        if current_version < latest_version {
+            Some(latest_version.to_string())
         } else {
             None
         }
@@ -346,13 +341,6 @@ impl VersionUpdater {
         let next_delay = || Box::pin(tokio::time::sleep(UPDATE_CHECK_INTERVAL)).fuse();
         let mut check_delay = next_delay();
         let mut version_check = futures::future::Fuse::terminated();
-
-        // If this is a dev build ,there's no need to pester the API for version checks.
-        if *IS_DEV_BUILD {
-            log::warn!("Not checking for updates because this is a development build");
-            while let Some(_) = rx.next().await {}
-            return;
-        }
 
         loop {
             futures::select! {
