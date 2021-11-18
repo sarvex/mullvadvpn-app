@@ -23,6 +23,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private let simulatorTunnelProvider = SimulatorTunnelProviderHost()
     #endif
 
+    private lazy var contentOcclussionWindow: UIWindow = {
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = ContentOcclusionViewController()
+        window.windowLevel = .alert + 1
+        return window
+    }()
+
     private var rootContainer: RootContainerViewController?
     private var splitViewController: CustomSplitViewController?
     private var selectLocationViewController: SelectLocationViewController?
@@ -122,6 +129,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         // Show the window
         self.window?.makeKeyAndVisible()
+        contentOcclussionWindow.makeKeyAndVisible()
 
         return true
     }
@@ -132,6 +140,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         // Start periodic private key rotation
         TunnelManager.shared.startPeriodicPrivateKeyRotation()
+
+        // Reveal application content
+        //contentOcclussionWindow.isHidden = true
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -140,6 +151,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         // Stop periodic private key rotation
         TunnelManager.shared.stopPeriodicPrivateKeyRotation()
+
+        // Hide application content
+        //contentOcclussionWindow.makeKeyAndVisible()
+
+        // Prevent iOS from using the snapshot of the app on next launch
+        application.ignoreSnapshotOnNextApplicationLaunch()
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
