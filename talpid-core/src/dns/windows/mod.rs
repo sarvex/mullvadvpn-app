@@ -1,10 +1,14 @@
-use crate::logging::windows::{log_sink, LogSink};
+use crate::{
+    logging::windows::{log_sink, LogSink},
+    windows::luid_from_alias,
+};
 
 use lazy_static::lazy_static;
 use log::{error, trace, warn};
 use std::{env, io, net::IpAddr, path::Path};
 use talpid_types::ErrorExt;
 use widestring::WideCString;
+use winapi::shared::ifdef::NET_LUID;
 use winreg::{
     enums::{HKEY_LOCAL_MACHINE, REG_MULTI_SZ},
     transaction::Transaction,
@@ -23,6 +27,7 @@ lazy_static! {
 
 /// Errors that can happen when configuring DNS on Windows.
 #[derive(err_derive::Error, Debug)]
+#[error(no_from)]
 pub enum Error {
     /// Failure to initialize WinDns.
     #[error(display = "Failed to initialize WinDns")]
@@ -35,6 +40,10 @@ pub enum Error {
     /// Failure to set new DNS servers on the interface.
     #[error(display = "Failed to set new DNS servers on interface")]
     Setting,
+
+    /// Failure to set new DNS servers on the interface.
+    #[error(display = "Failed to obtain LUID for the interface alias")]
+    InterfaceLuidError(#[error(source)] io::Error),
 
     /// Failure to set new DNS servers.
     #[error(display = "Failed to update dnscache policy config")]
@@ -79,9 +88,11 @@ impl super::DnsMonitorT for DnsMonitor {
         trace!("ipv4 ips - {:?} - {}", ipv4, ipv4.len());
         trace!("ipv6 ips - {:?} - {}", ipv6, ipv6.len());
 
+        let luid = luid_from_alias(interface).map_err(Error::InterfaceLuidError)?;
+
         unsafe {
             WinDns_Set(
-                WideCString::from_str(interface).unwrap().as_ptr(),
+                &luid,
                 ipv4_address_ptrs.as_mut_ptr(),
                 ipv4_address_ptrs.len() as u32,
                 ipv6_address_ptrs.as_mut_ptr(),
@@ -133,20 +144,22 @@ impl Drop for DnsMonitor {
 }
 
 fn set_dns_cache_policy(servers: &[IpAddr]) -> Result<(), Error> {
-    let transaction = Transaction::new()?;
+    let transaction = Transaction::new().map_err(Error::UpdateDnsCachePolicy)?;
     match set_dns_cache_policy_inner(&transaction, servers) {
         Ok(()) => {
-            transaction.commit()?;
+            transaction.commit().map_err(Error::UpdateDnsCachePolicy)?;
             Ok(())
         }
         Err(error) => {
-            transaction.rollback()?;
-            Err(error)
+            transaction
+                .rollback()
+                .map_err(Error::UpdateDnsCachePolicy)?;
+            Err(Error::UpdateDnsCachePolicy(error))
         }
     }
 }
 
-fn set_dns_cache_policy_inner(transaction: &Transaction, servers: &[IpAddr]) -> Result<(), Error> {
+fn set_dns_cache_policy_inner(transaction: &Transaction, servers: &[IpAddr]) -> io::Result<()> {
     let (dns_cache_parameters, _) = RegKey::predef(HKEY_LOCAL_MACHINE).create_subkey_transacted(
         r#"SYSTEM\CurrentControlSet\Services\DnsCache\Parameters"#,
         transaction,
@@ -179,7 +192,8 @@ fn set_dns_cache_policy_inner(transaction: &Transaction, servers: &[IpAddr]) -> 
 
 fn reset_dns_cache_policy() -> Result<(), Error> {
     let (dns_cache_parameters, _) = RegKey::predef(HKEY_LOCAL_MACHINE)
-        .create_subkey(r#"SYSTEM\CurrentControlSet\Services\DnsCache\Parameters"#)?;
+        .create_subkey(r#"SYSTEM\CurrentControlSet\Services\DnsCache\Parameters"#)
+        .map_err(Error::UpdateDnsCachePolicy)?;
     match dns_cache_parameters.delete_value("DnsSecureNameQueryFallback") {
         Ok(()) => Ok(()),
         Err(error) => {
@@ -238,7 +252,7 @@ extern "stdcall" {
     // Configure which DNS servers should be used and start enforcing these settings.
     #[link_name = "WinDns_Set"]
     pub fn WinDns_Set(
-        interface_alias: *const u16,
+        interface_luid: *const NET_LUID,
         v4_ips: *mut *const u16,
         v4_n_ips: u32,
         v6_ips: *mut *const u16,
