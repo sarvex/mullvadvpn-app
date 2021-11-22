@@ -72,13 +72,6 @@ impl AccessTokenProxy {
             .fetch_access_token(account.clone())
             .await
             .map_err(|error| {
-                let error = match error {
-                    rest::Error::ApiError(status, _code) if status == StatusCode::BAD_REQUEST => {
-                        // FIXME: Temporary. The API is supposed to return INVALID_ACCOUNT here.
-                        rest::Error::ApiError(status, crate::INVALID_ACCOUNT.to_string())
-                    }
-                    error => error,
-                };
                 log::error!(
                     "{}",
                     error.display_chain_with_msg("Failed to obtain access token")
