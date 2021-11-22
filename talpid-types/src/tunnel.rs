@@ -115,6 +115,7 @@ pub enum ErrorStateCause {
 }
 
 impl ErrorStateCause {
+    #[cfg(target_os = "macos")]
     pub fn prevents_custom_resolver(&self) -> bool {
         match self {
             Self::CustomResolverError | Self::ReadSystemDnsConfig | Self::SetDnsError => true,
