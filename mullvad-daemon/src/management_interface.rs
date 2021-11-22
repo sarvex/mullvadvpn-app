@@ -378,7 +378,6 @@ impl ManagementService for ManagementServiceImpl {
     }
 
     async fn login_account(&self, request: Request<AccountToken>) -> ServiceResult<()> {
-        // TODO: Return device?
         log::debug!("login_account");
         let account_token = request.into_inner();
         let (tx, rx) = oneshot::channel();
