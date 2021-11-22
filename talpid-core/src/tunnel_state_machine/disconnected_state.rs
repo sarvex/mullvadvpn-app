@@ -19,16 +19,25 @@ pub struct DisconnectedState {
 }
 
 impl DisconnectedState {
+    fn reset_allowed_resolvers(
+        &mut self,
+        resolver_config: &Option<(String, Vec<IpAddr>)>,
+        shared_values: &mut SharedTunnelStateValues,
+    ) {
+        if let Some((_interface, resolver_ips)) = &resolver_config {
+            self.allowed_resolvers = resolver_ips.iter().cloned().collect();
+        } else {
+            self.allowed_resolvers = BTreeSet::new();
+        }
+        self.set_firewall_policy(shared_values, false);
+    }
+
     fn set_firewall_policy(
         &mut self,
         shared_values: &mut SharedTunnelStateValues,
         should_reset_firewall: bool,
     ) {
         let result = if shared_values.block_when_disconnected {
-            #[cfg(target_os = "macos")]
-            let (resolver_unblocker, allowed_resolvers) = shared_values.start_custom_resolver();
-            self.allowed_resolvers = allowed_resolvers;
-
             let policy = FirewallPolicy::Blocked {
                 allow_lan: shared_values.allow_lan,
                 allowed_endpoint: shared_values.allowed_endpoint.clone(),
@@ -42,10 +51,6 @@ impl DisconnectedState {
                 )
             });
 
-            #[cfg(target_os = "macos")]
-            if let Some(resolver) = resolver_unblocker {
-                resolver.unblock()
-            };
             firewall_result
         } else if should_reset_firewall {
             shared_values
@@ -113,6 +118,19 @@ impl TunnelState for DisconnectedState {
             #[cfg(target_os = "macos")]
             allowed_resolvers: BTreeSet::new(),
         };
+
+        #[cfg(target_os = "macos")]
+        if shared_values.enable_custom_resolver {
+            if let Err(err) = shared_values
+                .dns_monitor
+                .set("lo", &[Ipv4Addr::LOCALHOST.into()])
+            {
+                log::error!(
+                    "{}",
+                    err.display_chain_with_msg("Failed to configure system to use custom resolver")
+                );
+            }
+        }
 
         #[cfg(windows)]
         Self::register_split_tunnel_addresses(shared_values, should_reset_firewall);
@@ -202,22 +220,21 @@ impl TunnelState for DisconnectedState {
             }
             #[cfg(target_os = "macos")]
             Some(TunnelCommand::SetCustomResolver(enable, done_tx)) => {
-                if let Err(err) = shared_values.toggle_custom_resolver(enable) {
+                if let Err(err) = shared_values.deactivate_custom_resolver(enable) {
                     let _ = done_tx.send(Err(err));
                     return SameState(self.into());
                 };
 
                 if shared_values.block_when_disconnected && enable {
                     match shared_values.dns_monitor.get_system_config() {
-                        Ok(system_resolvers) => {
-                            match shared_values.runtime.block_on(
-                                shared_values.custom_resolver.set_active(system_resolvers),
-                            ) {
-                                Ok(result) => {
-                                    self.allowed_resolvers =
-                                        result.currently_used_resolvers.clone();
-                                    self.set_firewall_policy(shared_values, false);
-                                    result.unblock();
+                        Ok(system_config) => {
+                            self.reset_allowed_resolvers(&system_config, shared_values);
+
+                            match shared_values
+                                .runtime
+                                .block_on(shared_values.custom_resolver.set_active(system_config))
+                            {
+                                Ok(_) => {
                                     if let Err(err) = shared_values
                                         .dns_monitor
                                         .set("lo", &[Ipv4Addr::LOCALHOST.into()])
@@ -245,7 +262,7 @@ impl TunnelState for DisconnectedState {
                                 err.display_chain_with_msg("Failed to obtain system DNS config")
                             );
 
-                            let _ = done_tx.send(Err(resolver::Error::NoSystemResolvers));
+                            let _ = done_tx.send(Err(resolver::Error::SystemDnsError(err)));
                         }
                     }
                 } else {
@@ -256,41 +273,19 @@ impl TunnelState for DisconnectedState {
             #[cfg(target_os = "macos")]
             Some(TunnelCommand::HostDnsConfig(host_config)) => {
                 if shared_values.block_when_disconnected && shared_values.enable_custom_resolver {
-                    // TODO: reconfigure custom resolver
-                    match shared_values
+                    self.reset_allowed_resolvers(&host_config, shared_values);
+                    if let Err(err) = shared_values
                         .runtime
                         .block_on(shared_values.custom_resolver.set_active(host_config))
                     {
-                        Ok(result) => {
-                            self.allowed_resolvers = result.currently_used_resolvers.clone();
-                            self.set_firewall_policy(shared_values, false);
-                            result.unblock();
-                            if let Err(err) = shared_values
-                                .dns_monitor
-                                .set("lo", &[Ipv4Addr::LOCALHOST.into()])
-                            {
-                                log::error!(
-                                    "{}",
-                                    err.display_chain_with_msg(
-                                        "Failed to configure system to use custom resolver"
-                                    )
-                                );
-                                return NewState(ErrorState::enter(
-                                    shared_values,
-                                    ErrorStateCause::SetDnsError,
-                                ));
-                            }
-                        }
-                        Err(err) => {
-                            log::error!(
-                                "{}",
-                                err.display_chain_with_msg("Failed to activate custom resolver")
-                            );
-                            return NewState(ErrorState::enter(
-                                shared_values,
-                                ErrorStateCause::CustomResolverError,
-                            ));
-                        }
+                        log::error!(
+                            "{}",
+                            err.display_chain_with_msg("Failed to activate custom resolver")
+                        );
+                        return NewState(ErrorState::enter(
+                            shared_values,
+                            ErrorStateCause::CustomResolverError,
+                        ));
                     }
                 }
                 SameState(self.into())
